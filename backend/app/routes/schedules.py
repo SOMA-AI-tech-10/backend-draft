@@ -10,9 +10,17 @@ from app.schemas import (
     AnalyzeScheduleResponse,
     ScheduleCreate,
     ScheduleRead,
+    ScheduleUpdate,
 )
 from app.services.schedule_graph import analyze_schedule
-from app.services.schedule_service import create_schedule, list_schedules
+from app.services.schedule_service import (
+    ScheduleNotFoundError,
+    ScheduleValidationError,
+    create_schedule,
+    delete_schedule,
+    list_schedules,
+    update_schedule,
+)
 
 router = APIRouter()
 
@@ -20,7 +28,7 @@ router = APIRouter()
 @router.post("/analyze", response_model=AnalyzeScheduleResponse)
 def analyze_schedule_route(payload: AnalyzeScheduleRequest) -> AnalyzeScheduleResponse:
     try:
-        return analyze_schedule(payload.text, payload.timezone)
+        return analyze_schedule(payload.text, payload.timezone, payload.analysis_context)
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -32,7 +40,13 @@ def analyze_schedule_route(payload: AnalyzeScheduleRequest) -> AnalyzeScheduleRe
 def create_schedule_route(payload: ScheduleCreate, db: Session = Depends(get_db)):
     try:
         return create_schedule(db, payload)
+    except ScheduleValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     except SQLAlchemyError as exc:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="일정을 저장하지 못했습니다.",
@@ -42,3 +56,46 @@ def create_schedule_route(payload: ScheduleCreate, db: Session = Depends(get_db)
 @router.get("", response_model=list[ScheduleRead])
 def list_schedules_route(db: Session = Depends(get_db)):
     return list_schedules(db)
+
+
+@router.patch("/{schedule_id}", response_model=ScheduleRead)
+def update_schedule_route(
+    schedule_id: int,
+    payload: ScheduleUpdate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return update_schedule(db, schedule_id, payload)
+    except ScheduleNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="일정을 찾을 수 없습니다.",
+        ) from exc
+    except ScheduleValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="일정을 수정하지 못했습니다.",
+        ) from exc
+
+
+@router.delete("/{schedule_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_schedule_route(schedule_id: int, db: Session = Depends(get_db)):
+    try:
+        delete_schedule(db, schedule_id)
+    except ScheduleNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="일정을 찾을 수 없습니다.",
+        ) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="일정을 삭제하지 못했습니다.",
+        ) from exc

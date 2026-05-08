@@ -18,6 +18,7 @@ class Schedule(Base):
     end_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     reminder_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    schedule_type: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
     original_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="confirmed")
     created_at: Mapped[datetime] = mapped_column(

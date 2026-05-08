@@ -3,6 +3,7 @@ from collections.abc import Generator
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
+from sqlalchemy import text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 load_dotenv()
@@ -20,6 +21,7 @@ class Base(DeclarativeBase):
 
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
+    _upgrade_sqlite_schema()
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -28,3 +30,14 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def _upgrade_sqlite_schema() -> None:
+    if not DATABASE_URL.startswith("sqlite"):
+        return
+
+    with engine.begin() as conn:
+        columns = conn.execute(text("PRAGMA table_info(schedules)")).mappings().all()
+        column_names = {column["name"] for column in columns}
+        if "schedule_type" not in column_names:
+            conn.execute(text("ALTER TABLE schedules ADD COLUMN schedule_type VARCHAR(80)"))
