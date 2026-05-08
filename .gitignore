@@ -1,7 +1,9 @@
 __pycache__/
 *.pyc
+*.log
 .DS_Store
 backend/.venv/
+schedules.db
 backend/schedules.db
 .env
 backend/.env
