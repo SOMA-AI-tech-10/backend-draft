@@ -47,6 +47,7 @@ class ScheduleCreate(BaseModel):
     reminder_minutes: int = Field(default=30, ge=0)
     schedule_type: Optional[str] = None
     original_text: Optional[str] = None
+    session_id: Optional[str] = None  # Google Calendar 연동 세션
 
 
 class ScheduleUpdate(BaseModel):
@@ -58,6 +59,18 @@ class ScheduleUpdate(BaseModel):
     schedule_type: Optional[str] = None
     original_text: Optional[str] = None
     status: Optional[str] = None
+    session_id: Optional[str] = None  # Google Calendar 연동 세션
+
+
+class BusySlot(BaseModel):
+    start: datetime
+    end: datetime
+
+
+class AvailabilityResponse(BaseModel):
+    time_min: datetime
+    time_max: datetime
+    busy: list[BusySlot]
 
 
 class ScheduleRead(BaseModel):
@@ -70,4 +83,5 @@ class ScheduleRead(BaseModel):
     location: Optional[str]
     reminder_minutes: int
     schedule_type: Optional[str]
+    google_event_id: Optional[str]
     status: str

@@ -81,10 +81,11 @@ def update_schedule(db: Session, schedule_id: int, data: ScheduleUpdate) -> Sche
     return schedule
 
 
-def delete_schedule(db: Session, schedule_id: int) -> None:
+def delete_schedule(db: Session, schedule_id: int, session_id: str | None = None) -> Schedule:
     schedule = get_schedule(db, schedule_id)
     db.delete(schedule)
     db.commit()
+    return schedule
 
 
 def _validate_schedule(

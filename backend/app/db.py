@@ -41,3 +41,5 @@ def _upgrade_sqlite_schema() -> None:
         column_names = {column["name"] for column in columns}
         if "schedule_type" not in column_names:
             conn.execute(text("ALTER TABLE schedules ADD COLUMN schedule_type VARCHAR(80)"))
+        if "google_event_id" not in column_names:
+            conn.execute(text("ALTER TABLE schedules ADD COLUMN google_event_id VARCHAR(255)"))
