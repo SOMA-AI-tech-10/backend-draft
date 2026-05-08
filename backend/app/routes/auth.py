@@ -3,7 +3,12 @@ from __future__ import annotations
 import json
 import os
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+# HTTP 로컬 개발 환경에서 oauthlib InsecureTransportError 방지
+os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
+
+from typing import Dict, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from google_auth_oauthlib.flow import Flow
 from sqlalchemy.orm import Session
@@ -15,8 +20,11 @@ router = APIRouter()
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
+# PKCE code verifier 임시 저장 (서버 재시작 시 초기화됨)
+_code_verifiers: Dict[str, str] = {}
 
-def _make_flow(state: str | None = None) -> Flow:
+
+def _make_flow(state: Optional[str] = None) -> Flow:
     client_config = {
         "web": {
             "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
@@ -26,7 +34,12 @@ def _make_flow(state: str | None = None) -> Flow:
             "token_uri": "https://oauth2.googleapis.com/token",
         }
     }
-    flow = Flow.from_client_config(client_config, scopes=SCOPES, state=state)
+    flow = Flow.from_client_config(
+        client_config,
+        scopes=SCOPES,
+        state=state,
+        autogenerate_code_verifier=True,  # Google이 PKCE 요구
+    )
     flow.redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/google/callback")
     return flow
 
@@ -42,28 +55,37 @@ def google_auth(session_id: str = Query(..., description="클라이언트 세션
     flow = _make_flow()
     auth_url, _ = flow.authorization_url(
         access_type="offline",
-        include_granted_scopes="true",
         state=session_id,
         prompt="consent",
     )
+    # 콜백에서 토큰 교환 시 필요한 code_verifier를 세션 ID로 보관
+    _code_verifiers[session_id] = flow.code_verifier
     return RedirectResponse(auth_url)
 
 
 @router.get("/google/callback")
 def google_callback(
-    code: str = Query(...),
+    request: Request,
     state: str = Query(...),
     db: Session = Depends(get_db),
 ):
     """Google에서 돌아오는 콜백. 토큰을 받아 DB에 저장."""
     session_id = state
+    code_verifier = _code_verifiers.pop(session_id, None)
+    if not code_verifier:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="인증 세션이 만료됐습니다. /auth/google 부터 다시 시도해주세요.",
+        )
+
     flow = _make_flow(state=session_id)
+    flow.code_verifier = code_verifier
     try:
-        flow.fetch_token(code=code)
+        flow.fetch_token(authorization_response=str(request.url))
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Google 인증 코드가 올바르지 않습니다.",
+            detail=f"Google 인증 실패: {type(exc).__name__}: {exc}",
         ) from exc
 
     creds = flow.credentials

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Optional
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.models import GoogleCredential, Schedule
 
 
-def get_credentials(session_id: str, db: Session) -> Credentials | None:
+def get_credentials(session_id: str, db: Session) -> Optional[Credentials]:
     """DB에서 토큰을 불러오고, 만료됐으면 자동으로 갱신 후 저장."""
     row = db.query(GoogleCredential).filter_by(session_id=session_id).first()
     if not row:

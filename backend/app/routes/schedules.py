@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from googleapiclient.errors import HttpError
 from sqlalchemy.exc import SQLAlchemyError
@@ -103,7 +105,7 @@ def update_schedule_route(
 @router.delete("/{schedule_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_schedule_route(
     schedule_id: int,
-    session_id: str | None = Query(default=None),
+    session_id: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
 ):
     try:
