@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -81,10 +82,11 @@ def update_schedule(db: Session, schedule_id: int, data: ScheduleUpdate) -> Sche
     return schedule
 
 
-def delete_schedule(db: Session, schedule_id: int) -> None:
+def delete_schedule(db: Session, schedule_id: int, session_id: Optional[str] = None) -> Schedule:
     schedule = get_schedule(db, schedule_id)
     db.delete(schedule)
     db.commit()
+    return schedule
 
 
 def _validate_schedule(
